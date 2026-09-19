@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=FocusBlock
+GenericName=Distraction Blocker
+Comment=Block distracting websites and desktop applications for a focus duration
+Exec=/home/chen/focus_block/run.sh
+Icon=preferences-system-time
+Terminal=false
+Type=Application
+Categories=Utility;Clock;AudioVideo;System;
+StartupNotify=true
