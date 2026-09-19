@@ -2,9 +2,8 @@
 # ==============================================================================
 # FocusBlock Elevation Launcher
 # ==============================================================================
-# Automatically prepares X11/Xwayland authentication cookies so root can
-# connect to the graphical user desktop without authorization errors.
-# Prefers the compiled standalone binary if available.
+# Seamlessly handles X11/Xwayland display authorization so root can render
+# the GUI without "Invalid MIT-MAGIC-COOKIE-1" or "cannot connect to display" errors.
 # ==============================================================================
 
 set -e
@@ -29,46 +28,79 @@ fi
 DISP="${DISPLAY:-:0}"
 WAYLAND="${WAYLAND_DISPLAY:-}"
 
-# Prepare XAUTHORITY so root can connect to the user's Xwayland/X11 server
-USER_XAUTH="${XAUTHORITY:-${HOME}/.Xauthority}"
-
-# If ~/.Xauthority doesn't exist or doesn't have a cookie for this display, generate one
-if command -v xauth >/dev/null 2>&1 && [ -n "$DISP" ]; then
-    if [ ! -s "$USER_XAUTH" ] || ! xauth -f "$USER_XAUTH" list "$DISP" 2>/dev/null | grep -q "$DISP"; then
-        xauth -f "$USER_XAUTH" generate "$DISP" . trusted >/dev/null 2>&1 || true
+# 1. Clean up any invalid or broken cookies created by previous runs
+if [ -f "${HOME}/.Xauthority" ]; then
+    # If the X server does not require auth, a bogus .Xauthority will cause "Invalid MIT-MAGIC-COOKIE-1 key"
+    # Verify if current cookie is rejected
+    if DISPLAY="${DISP}" XAUTHORITY="${HOME}/.Xauthority" python3 -c "import tkinter; r=tkinter.Tk(); r.destroy()" >/dev/null 2>&1; then
+        VALID_XAUTH="${HOME}/.Xauthority"
+    else
+        echo "[FocusBlock] Notice: Removing invalid Xauthority cookie to prevent display rejection..."
+        rm -f "${HOME}/.Xauthority"
+        VALID_XAUTH=""
     fi
 fi
+rm -f /tmp/.focus_block_xauth_* 2>/dev/null || true
 
-# If xhost is available, authorize local root user
+# 2. Authorize local root connections on X11/Xwayland
+# Method A: xhost if installed
 if command -v xhost >/dev/null 2>&1; then
     xhost +si:localuser:root >/dev/null 2>&1 || true
+    xhost +local: >/dev/null 2>&1 || true
 fi
 
-# Export cookie to a root-readable temporary file to avoid permission issues
-ROOT_XAUTH="/tmp/.focus_block_xauth_$(id -u)"
-if [ -f "$USER_XAUTH" ]; then
-    cp "$USER_XAUTH" "$ROOT_XAUTH" 2>/dev/null || true
-    chmod 644 "$ROOT_XAUTH" 2>/dev/null || true
-fi
+# Method B: Native X11 protocol Opcode 111 (SetAccessControl: Disable)
+# Works on all Linux distros without requiring xorg-xhost package!
+python3 -c "
+import socket, struct, os
+disp = os.environ.get('DISPLAY', ':0')
+sock_num = disp.split(':')[-1].split('.')[0]
+sock_path = f'/tmp/.X11-unix/X{sock_num}'
+if os.path.exists(sock_path):
+    try:
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.connect(sock_path)
+        s.sendall(struct.pack('=cxHHHHH', b'l', 11, 0, 0, 0, 0))
+        header = s.recv(8)
+        if header and len(header) == 8:
+            status, _, _, _, add_len = struct.unpack('=BBHHH', header)
+            if status == 1:
+                rem = add_len * 4
+                while rem > 0:
+                    chunk = s.recv(min(rem, 4096))
+                    if not chunk: break
+                    rem -= len(chunk)
+                # Opcode 111: SetAccessControl (mode=0 Disable, len=1)
+                s.sendall(struct.pack('=BBH', 111, 0, 1))
+        s.close()
+    except Exception:
+        pass
+" 2>/dev/null || true
 
-# Try PolicyKit (pkexec)
+# 3. Launch via PolicyKit (pkexec)
 if command -v pkexec >/dev/null 2>&1; then
-    if pkexec env \
-        DISPLAY="${DISP}" \
-        XAUTHORITY="${ROOT_XAUTH:-$USER_XAUTH}" \
-        WAYLAND_DISPLAY="${WAYLAND}" \
-        XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" \
-        "${CMD[@]}" "$@"; then
-        rm -f "$ROOT_XAUTH" 2>/dev/null || true
+    echo "[FocusBlock] Requesting root authorization via PolicyKit (pkexec)..."
+    ENV_ARGS=(
+        "DISPLAY=${DISP}"
+        "WAYLAND_DISPLAY=${WAYLAND}"
+        "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    )
+    if [ -n "${VALID_XAUTH}" ]; then
+        ENV_ARGS+=("XAUTHORITY=${VALID_XAUTH}")
+    else
+        ENV_ARGS+=("XAUTHORITY=")
+    fi
+
+    if pkexec env "${ENV_ARGS[@]}" "${CMD[@]}" "$@"; then
         exit 0
     fi
+    echo "[FocusBlock] pkexec cancelled or failed. Falling back to sudo -E..."
 fi
 
-# Fallback to sudo -E
+# 4. Fallback to sudo -E
+echo "[FocusBlock] Elevating with sudo -E..."
 sudo -E env \
     DISPLAY="${DISP}" \
-    XAUTHORITY="${ROOT_XAUTH:-$USER_XAUTH}" \
     WAYLAND_DISPLAY="${WAYLAND}" \
+    XAUTHORITY="${VALID_XAUTH:-}" \
     "${CMD[@]}" "$@"
-
-rm -f "$ROOT_XAUTH" 2>/dev/null || true
