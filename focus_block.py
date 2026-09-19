@@ -1363,7 +1363,52 @@ def main() -> None:
         action="store_true",
         help="Run in unprivileged simulation mode using mock files for testing UI and anti-bypass logic.",
     )
+    parser.add_argument(
+        "--emergency-unlock",
+        "--unlock",
+        action="store_true",
+        help="Emergency recovery: force unlock, clean /etc/hosts, restore all binary permissions, and delete lock file.",
+    )
     args = parser.parse_args()
+
+    # Emergency unlock handler
+    if args.emergency_unlock:
+        if os.geteuid() != 0:
+            print("[Error] Emergency unlock requires root privileges. Please run with sudo:", file=sys.stderr)
+            print("  sudo python3 focus_block.py --emergency-unlock", file=sys.stderr)
+            sys.exit(1)
+
+        print("[FocusBlock] Executing emergency state restoration...")
+        sys_mgr = SystemManager()
+        l_mgr = FocusLockManager()
+
+        # 1. Clean hosts
+        ok, msg = sys_mgr.cleanup_hosts()
+        print(f"  [1/4] {msg}")
+
+        # 2. Flush DNS
+        ok, msg = sys_mgr.flush_dns()
+        print(f"  [2/4] {msg}")
+
+        # 3. Restore app permissions
+        lock_data = l_mgr.load_lock_data() or {}
+        restore_targets = set(lock_data.get("apps", []))
+        restore_targets.update(lock_data.get("all_modified_binaries", []))
+        for d in DEFAULT_APPS:
+            restore_targets.add(d)
+
+        count = 0
+        for target in restore_targets:
+            ok, msg = sys_mgr.unblock_application(target)
+            if ok:
+                count += 1
+                print(f"  [3/4] {msg}")
+
+        # 4. Remove lock file
+        l_mgr.remove_lock()
+        print(f"  [4/4] Removed root lock file {l_mgr.lock_path}.")
+        print("\n[SUCCESS] All websites and application execute permissions have been completely restored!\n")
+        sys.exit(0)
 
     # Check for root privileges unless simulation mode was explicitly requested
     verify_root_privileges(allow_unprivileged=args.simulation)
