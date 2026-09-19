@@ -1,10 +1,22 @@
 [Desktop Entry]
+Version=1.0
 Name=FocusBlock
 GenericName=Distraction Blocker
-Comment=Block distracting websites and desktop applications for a focus duration
+Comment=Block distracting websites and desktop applications for focus duration
 Exec=/home/chen/focus_block/run.sh
-Icon=preferences-system-time
+Icon=/home/chen/focus_block/assets/focus-block.png
 Terminal=false
 Type=Application
-Categories=Utility;Clock;AudioVideo;System;
+Categories=Utility;Clock;System;
 StartupNotify=true
+Actions=Simulation;EmergencyUnlock;
+
+[Desktop Action Simulation]
+Name=Open in Simulation Mode (No Root)
+Exec=/home/chen/focus_block/dist/focus-block --simulation
+Icon=/home/chen/focus_block/assets/focus-block.png
+
+[Desktop Action EmergencyUnlock]
+Name=Emergency Unlock (Force Stop)
+Exec=/home/chen/focus_block/run.sh --emergency-unlock
+Icon=/home/chen/focus_block/assets/focus-block.png

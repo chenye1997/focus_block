@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e2e"/>
+      <stop offset="50%" stop-color="#24273a"/>
+      <stop offset="100%" stop-color="#181825"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#89dceb"/>
+      <stop offset="100%" stop-color="#74c7ec"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a6e3a1"/>
+      <stop offset="100%" stop-color="#89b4fa"/>
+    </linearGradient>
+    <linearGradient id="glowGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f38ba8"/>
+      <stop offset="100%" stop-color="#fab387"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background Shield -->
+  <path d="M 256,36 C 365,65 440,88 440,190 C 440,320 350,420 256,476 C 162,420 72,320 72,190 C 72,88 147,65 256,36 Z"
+        fill="url(#shieldGrad)"
+        stroke="url(#accentGrad)"
+        stroke-width="14"
+        stroke-linejoin="round"/>
+
+  <!-- Inner Cyber Ring -->
+  <circle cx="256" cy="240" r="120"
+          fill="none"
+          stroke="#313244"
+          stroke-width="12"
+          stroke-dasharray="14 10"/>
+
+  <circle cx="256" cy="240" r="100"
+          fill="#181825"
+          stroke="url(#cyanGrad)"
+          stroke-width="6"/>
+
+  <!-- Clock / Timer Crosshairs -->
+  <line x1="256" y1="150" x2="256" y2="175" stroke="url(#accentGrad)" stroke-width="6" stroke-linecap="round"/>
+  <line x1="256" y1="305" x2="256" y2="330" stroke="url(#accentGrad)" stroke-width="6" stroke-linecap="round"/>
+  <line x1="166" y1="240" x2="191" y2="240" stroke="url(#accentGrad)" stroke-width="6" stroke-linecap="round"/>
+  <line x1="321" y1="240" x2="346" y2="240" stroke="url(#accentGrad)" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Hour & Minute Clock Hands (Focused Time) -->
+  <line x1="256" y1="240" x2="256" y2="180" stroke="#cdd6f4" stroke-width="8" stroke-linecap="round"/>
+  <line x1="256" y1="240" x2="300" y2="210" stroke="url(#glowGrad)" stroke-width="6" stroke-linecap="round" filter="url(#glow)"/>
+  <circle cx="256" cy="240" r="10" fill="url(#accentGrad)"/>
+
+  <!-- Anti-Bypass Lock Icon Accent at Bottom Center -->
+  <rect x="236" y="375" width="40" height="32" rx="6" fill="url(#glowGrad)"/>
+  <path d="M 244,375 V 360 C 244,352 250,346 256,346 C 262,346 268,352 268,360 V 375"
+        fill="none" stroke="url(#glowGrad)" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="256" cy="390" r="4" fill="#181825"/>
+</svg>

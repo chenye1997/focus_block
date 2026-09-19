@@ -4,16 +4,25 @@
 # ==============================================================================
 # Automatically prepares X11/Xwayland authentication cookies so root can
 # connect to the graphical user desktop without authorization errors.
+# Prefers the compiled standalone binary if available.
 # ==============================================================================
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+BINARY="${SCRIPT_DIR}/dist/focus-block"
 PYTHON_SCRIPT="${SCRIPT_DIR}/focus_block.py"
+
+# Select execution target: prefer compiled binary if present
+if [ -x "${BINARY}" ]; then
+    CMD=("${BINARY}")
+else
+    CMD=(/usr/bin/python3 "${PYTHON_SCRIPT}")
+fi
 
 # If already running as root, execute directly
 if [ "$EUID" -eq 0 ]; then
-    exec /usr/bin/python3 "${PYTHON_SCRIPT}" "$@"
+    exec "${CMD[@]}" "$@"
 fi
 
 # Detect display environment
@@ -44,25 +53,22 @@ fi
 
 # Try PolicyKit (pkexec)
 if command -v pkexec >/dev/null 2>&1; then
-    echo "[FocusBlock] Requesting root authorization via PolicyKit (pkexec)..."
     if pkexec env \
         DISPLAY="${DISP}" \
         XAUTHORITY="${ROOT_XAUTH:-$USER_XAUTH}" \
         WAYLAND_DISPLAY="${WAYLAND}" \
         XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}" \
-        /usr/bin/python3 "${PYTHON_SCRIPT}" "$@"; then
+        "${CMD[@]}" "$@"; then
         rm -f "$ROOT_XAUTH" 2>/dev/null || true
         exit 0
     fi
-    echo "[FocusBlock] pkexec cancelled or failed. Falling back to sudo -E..."
 fi
 
 # Fallback to sudo -E
-echo "[FocusBlock] Elevating with sudo -E..."
 sudo -E env \
     DISPLAY="${DISP}" \
     XAUTHORITY="${ROOT_XAUTH:-$USER_XAUTH}" \
     WAYLAND_DISPLAY="${WAYLAND}" \
-    /usr/bin/python3 "${PYTHON_SCRIPT}" "$@"
+    "${CMD[@]}" "$@"
 
 rm -f "$ROOT_XAUTH" 2>/dev/null || true
